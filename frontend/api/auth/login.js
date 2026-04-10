@@ -1,18 +1,34 @@
 const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
 
+// Your MongoDB connection string - UPDATE THIS WITH YOUR ACTUAL PASSWORD
 const uri = "mongodb+srv://admin:admin123@cluster0.walcgke.mongodb.net/sri_lakshmi_shop?retryWrites=true&w=majority";
 
 export default async function handler(req, res) {
-  // Allow only POST requests
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password required' });
+    return res.status(400).json({ error: 'Email and password required' });
   }
 
   let client;
@@ -28,19 +44,19 @@ export default async function handler(req, res) {
     
     if (!user) {
       await client.close();
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     // Verify password
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       await client.close();
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     await client.close();
 
-    // Return user data (without password)
+    // Return user data
     res.status(200).json({
       success: true,
       user: {
@@ -55,6 +71,6 @@ export default async function handler(req, res) {
   } catch (error) {
     if (client) await client.close();
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ error: 'Server error' });
   }
 }
