@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_URL } from '../config';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -14,41 +15,32 @@ function LoginPage() {
     setLoading(true);
     setError('');
     
-    // Get users from localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    console.log('Available users:', users);
-    
-    // Find user by email
-    const user = users.find(u => u.email === email);
-    
-    if (!user) {
-      setError('No account found with this email');
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('isLoggedIn', 'true');
+        setLoading(false);
+        navigate('/');
+        window.location.reload();
+      } else {
+        setError(data.message || 'Invalid email or password');
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Network error. Please try again.');
       setLoading(false);
-      return;
     }
-    
-    // Check password (plain text comparison for demo)
-    if (user.password !== password) {
-      setError('Invalid password');
-      setLoading(false);
-      return;
-    }
-    
-    // Login successful
-    const userData = { 
-      name: user.name, 
-      email: user.email, 
-      phone: user.phone,
-      isAdmin: user.email === 'admin@example.com'
-    };
-    
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('isAdmin', userData.isAdmin ? 'true' : 'false');
-    
-    setLoading(false);
-    navigate('/');
-    window.location.reload();
   };
 
   const styles = {
@@ -117,6 +109,10 @@ function LoginPage() {
       fontSize: '16px',
       fontWeight: '600',
       cursor: 'pointer',
+    },
+    buttonDisabled: {
+      backgroundColor: '#95a5a6',
+      cursor: 'not-allowed',
     },
     errorMessage: {
       backgroundColor: '#fee2e2',
@@ -191,7 +187,14 @@ function LoginPage() {
             </Link>
           </div>
           
-          <button type="submit" style={styles.button} disabled={loading}>
+          <button 
+            type="submit" 
+            style={{
+              ...styles.button,
+              ...(loading ? styles.buttonDisabled : {})
+            }}
+            disabled={loading}
+          >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>

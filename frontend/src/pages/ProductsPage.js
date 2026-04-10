@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { API_URL } from '../config';
 
 function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -60,7 +61,8 @@ function ProductsPage() {
       return;
     }
     
-    fetch('http://localhost:5000/api/products')
+    fetch(`${API_URL}/products`)
+
       .then(res => res.json())
       .then(data => {
         setProducts(data);

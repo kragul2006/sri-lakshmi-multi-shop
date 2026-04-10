@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_URL } from '../config';
 
 function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -13,99 +14,17 @@ function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [phoneError, setPhoneError] = useState('');
-  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [emailAvailable, setEmailAvailable] = useState(false);
+  const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-
-  // Email validation regex
-  const validateEmailFormat = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // Check if email exists in database
-  const checkEmailExists = async (email) => {
-    if (!validateEmailFormat(email)) {
-      setEmailError('Please enter a valid email address');
-      setEmailAvailable(false);
-      return false;
-    }
-
-    setIsCheckingEmail(true);
-    setEmailError('');
-    
-    // Simulate API call to check email existence
-    setTimeout(() => {
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const emailExists = users.some(user => user.email === email);
-      
-      if (emailExists) {
-        setEmailError('❌ Email already registered. Please use a different email or login.');
-        setEmailAvailable(false);
-      } else {
-        setEmailError('✅ Email available!');
-        setEmailAvailable(true);
-      }
-      setIsCheckingEmail(false);
-    }, 500);
-  };
-
-  // Phone number validation - only numbers
-  const validatePhoneNumber = (phone) => {
-    const phoneRegex = /^\d{10}$/;
-    if (phone && !phoneRegex.test(phone)) {
-      setPhoneError('Phone number must be 10 digits (numbers only)');
-      return false;
-    }
-    setPhoneError('');
-    return true;
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name === 'phone') {
-      // Allow only numbers
-      const numbersOnly = value.replace(/[^0-9]/g, '');
-      if (numbersOnly.length <= 10) {
-        setFormData({ ...formData, [name]: numbersOnly });
-        validatePhoneNumber(numbersOnly);
-      }
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
-    
+    setFormData({ ...formData, [name]: value });
     setError('');
   };
 
-  const handleEmailBlur = () => {
-    if (formData.email) {
-      checkEmailExists(formData.email);
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate email format
-    if (!validateEmailFormat(formData.email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    
-    // Check if email is available
-    if (!emailAvailable) {
-      setError('Please use a different email address or login');
-      return;
-    }
-    
-    // Validate phone number
-    if (formData.phone && !validatePhoneNumber(formData.phone)) {
-      setError('Please enter a valid 10-digit phone number');
-      return;
-    }
     
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -120,45 +39,36 @@ function RegisterPage() {
     setLoading(true);
     setError('');
     
-    // Get existing users
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    
-    // Final check if email already exists
-    if (users.find(u => u.email === formData.email)) {
-      setError('Email already registered');
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          phone: formData.phone
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSuccess('Registration successful! Redirecting to login...');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } else {
+        setError(data.message || 'Registration failed');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      setError('Network error. Please try again.');
+    } finally {
       setLoading(false);
-      return;
     }
-    
-    // Create new user
-    const newUser = {
-      id: Date.now(),
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      loyaltyPoints: 0,
-      createdAt: new Date().toISOString()
-    };
-    
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    // Auto login after registration
-    const userData = { 
-      name: formData.name, 
-      email: formData.email, 
-      phone: formData.phone,
-      loyaltyPoints: 0,
-      isAdmin: formData.email === 'admin@example.com'
-    };
-    
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('isLoggedIn', 'true');
-    
-    setLoading(false);
-    navigate('/');
-    window.location.reload();
   };
 
   const styles = {
@@ -208,13 +118,6 @@ function RegisterPage() {
       border: '1px solid #ddd',
       borderRadius: '10px',
       fontSize: '16px',
-      transition: 'all 0.3s ease',
-    },
-    inputError: {
-      borderColor: '#e74c3c',
-    },
-    inputSuccess: {
-      borderColor: '#27ae60',
     },
     passwordToggle: {
       position: 'absolute',
@@ -234,8 +137,6 @@ function RegisterPage() {
       fontSize: '16px',
       fontWeight: '600',
       cursor: 'pointer',
-      transition: 'all 0.3s ease',
-      marginTop: '10px',
     },
     buttonDisabled: {
       backgroundColor: '#95a5a6',
@@ -259,16 +160,6 @@ function RegisterPage() {
       fontSize: '14px',
       textAlign: 'center',
     },
-    phoneHelper: {
-      fontSize: '12px',
-      color: '#7f8c8d',
-      marginTop: '5px',
-    },
-    checkingText: {
-      fontSize: '12px',
-      color: '#3498db',
-      marginTop: '5px',
-    },
     loginLink: {
       textAlign: 'center',
       marginTop: '20px',
@@ -281,8 +172,6 @@ function RegisterPage() {
     },
   };
 
-  const isFormValid = formData.name && formData.email && emailAvailable && formData.password && formData.confirmPassword && (!formData.phone || !phoneError);
-
   return (
     <div style={styles.container}>
       <div style={styles.formContainer}>
@@ -290,9 +179,9 @@ function RegisterPage() {
         <p style={styles.subtitle}>Join Sri Lakshmi Multi Shop today</p>
         
         {error && <div style={styles.errorMessage}>{error}</div>}
+        {success && <div style={styles.successMessage}>{success}</div>}
         
         <form onSubmit={handleSubmit}>
-          {/* Full Name Field */}
           <div style={styles.inputGroup}>
             <span style={styles.inputIcon}>👤</span>
             <input
@@ -306,7 +195,6 @@ function RegisterPage() {
             />
           </div>
           
-          {/* Email Field with Live Validation */}
           <div style={styles.inputGroup}>
             <span style={styles.inputIcon}>📧</span>
             <input
@@ -315,42 +203,23 @@ function RegisterPage() {
               placeholder="Email Address"
               value={formData.email}
               onChange={handleChange}
-              onBlur={handleEmailBlur}
-              style={{
-                ...styles.input,
-                ...(emailError && emailError.includes('available') ? styles.inputSuccess : emailError && styles.inputError),
-                ...(emailError === '✅ Email available!' ? styles.inputSuccess : {})
-              }}
+              style={styles.input}
               required
             />
-            {isCheckingEmail && <div style={styles.checkingText}>⏳ Checking email availability...</div>}
-            {emailError && !isCheckingEmail && (
-              <div style={{ fontSize: '12px', marginTop: '5px', color: emailError.includes('available') ? '#27ae60' : '#e74c3c' }}>
-                {emailError}
-              </div>
-            )}
           </div>
           
-          {/* Phone Number Field - Numbers Only */}
           <div style={styles.inputGroup}>
             <span style={styles.inputIcon}>📞</span>
             <input
               type="tel"
               name="phone"
-              placeholder="Phone Number (10 digits)"
+              placeholder="Phone Number"
               value={formData.phone}
               onChange={handleChange}
-              style={{
-                ...styles.input,
-                ...(phoneError ? styles.inputError : {})
-              }}
-              maxLength="10"
+              style={styles.input}
             />
-            {phoneError && <div style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>{phoneError}</div>}
-            <div style={styles.phoneHelper}>📱 Enter 10-digit mobile number (numbers only)</div>
           </div>
           
-          {/* Password Field */}
           <div style={styles.inputGroup}>
             <span style={styles.inputIcon}>🔒</span>
             <input
@@ -367,7 +236,6 @@ function RegisterPage() {
             </span>
           </div>
           
-          {/* Confirm Password Field */}
           <div style={styles.inputGroup}>
             <span style={styles.inputIcon}>🔒</span>
             <input
@@ -376,30 +244,21 @@ function RegisterPage() {
               placeholder="Confirm Password"
               value={formData.confirmPassword}
               onChange={handleChange}
-              style={{
-                ...styles.input,
-                ...(formData.confirmPassword && formData.password !== formData.confirmPassword ? styles.inputError : {})
-              }}
+              style={styles.input}
               required
             />
             <span style={styles.passwordToggle} onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
               {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
             </span>
-            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-              <div style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>❌ Passwords do not match</div>
-            )}
-            {formData.confirmPassword && formData.password === formData.confirmPassword && formData.password && (
-              <div style={{ fontSize: '12px', color: '#27ae60', marginTop: '5px' }}>✅ Passwords match</div>
-            )}
           </div>
           
           <button 
             type="submit" 
             style={{
               ...styles.button,
-              ...(!isFormValid ? styles.buttonDisabled : {})
+              ...(loading ? styles.buttonDisabled : {})
             }}
-            disabled={!isFormValid || loading}
+            disabled={loading}
           >
             {loading ? 'Creating Account...' : 'Register'}
           </button>
